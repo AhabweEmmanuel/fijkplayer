@@ -47,26 +47,26 @@ public class FijkPlugin
 
   // volume UI modes
   private static final int NO_UI_IF_PLAYABLE = 0;
-  private static final int NO_UI_IF_PLAYING = 1;
+  private static final int NO_UI_IF_PLAYING  = 1;
   @SuppressWarnings("unused")
-  private static final int NEVER_SHOW_UI      = 2;
-  private static final int ALWAYS_SHOW_UI     = 3;
+  private static final int NEVER_SHOW_UI     = 2;
+  private static final int ALWAYS_SHOW_UI    = 3;
 
   private final SparseArray<FijkPlayer> fijkPlayers = new SparseArray<>();
-  private final QueuingEventSink mEventSink = new QueuingEventSink();
+  private final QueuingEventSink mEventSink           = new QueuingEventSink();
 
   private FlutterPluginBinding mBinding;
   private WeakReference<Activity> mActivity;
-  private WeakReference<Context> mContext;
+  private WeakReference<Context>  mContext;
 
   private EventChannel mEventChannel;
   private Object       mAudioFocusRequest;
   private boolean      mAudioFocusRequested = false;
-  private int          playableCnt         = 0;
-  private int          playingCnt          = 0;
-  private int          volumeUIMode        = ALWAYS_SHOW_UI;
-  private float        volStep             = 1.0f / 16.0f;
-  private boolean      eventListening      = false;
+  private int          playableCnt          = 0;
+  private int          playingCnt           = 0;
+  private int          volumeUIMode         = ALWAYS_SHOW_UI;
+  private float        volStep              = 1.0f / 16.0f;
+  private boolean      eventListening       = false;
 
   // --- FlutterPlugin -------------------------------------------------------------------------
 
@@ -75,12 +75,10 @@ public class FijkPlugin
     mBinding = binding;
     mContext = new WeakReference<>(binding.getApplicationContext());
 
-    // Method channel for plugin calls
     MethodChannel channel =
         new MethodChannel(binding.getBinaryMessenger(), "befovy.com/fijk");
     channel.setMethodCallHandler(this);
 
-    // Event channel for global events
     mEventChannel = new EventChannel(binding.getBinaryMessenger(), "befovy.com/fijk/event");
     mEventChannel.setStreamHandler(new EventChannel.StreamHandler() {
       @Override
@@ -93,12 +91,11 @@ public class FijkPlugin
       }
     });
 
-    // warm-up a dummy player for surface registry
+    // Warm-up dummy player for surface registry
     FijkPlayer dummy = new FijkPlayer(this, true);
     dummy.setupSurface();
     dummy.release();
 
-    // compute volStep based on device max volume
     AudioManager audioManager = audioManager();
     if (audioManager != null) {
       int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -329,7 +326,19 @@ public class FijkPlugin
     }
   }
 
-  // --- FijkVolume.VolumeKeyListener --------------------------------------------------------
+  // --- FijkEngine callbacks ----------------------------------------------------------------
+
+  @Override
+  public void onPlayingChange(int delta) {
+    playingCnt += delta;
+  }
+
+  @Override
+  public void onPlayableChange(int delta) {
+    playableCnt += delta;
+  }
+
+  // --- Volume-key listener ------------------------------------------------------------------
 
   @Override
   public boolean onVolumeKeyDown(int keyCode, KeyEvent event) {
@@ -360,7 +369,8 @@ public class FijkPlugin
     Log.i("FIJKPLAYER", "onAudioFocusChange: " + focusChange);
   }
 
-  private void setScreenOn(boolean on) {
+  @Override
+  public void setScreenOn(boolean on) {
     Activity activity = mActivity != null ? mActivity.get() : null;
     if (activity == null) return;
     if (on) {
@@ -388,8 +398,7 @@ public class FijkPlugin
           brightness = Settings.System.getInt(
               ctx.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS) / 255f;
         }
-      } catch (Settings.SettingNotFoundException ignored) {
-      }
+      } catch (Settings.SettingNotFoundException ignored) { }
     }
     return brightness;
   }
@@ -402,6 +411,7 @@ public class FijkPlugin
     activity.getWindow().setAttributes(lp);
   }
 
+  @TargetApi(26)
   private void requestAudioFocus() {
     AudioManager am = audioManager();
     if (am == null) return;
@@ -423,6 +433,7 @@ public class FijkPlugin
     mAudioFocusRequested = true;
   }
 
+  @TargetApi(26)
   private void abandonAudioFocus() {
     AudioManager am = audioManager();
     if (am == null) return;
